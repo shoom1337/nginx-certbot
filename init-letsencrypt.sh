@@ -5,7 +5,7 @@ if ! [ -x "$(command -v docker-compose)" ]; then
   exit 1
 fi
 
-domains=(YOUT_DOMAIN)
+domains=(YOUR_DOMAIN_HERE)
 rsa_key_size=4096
 data_path="./data/certbot" # Path to mapped data directory for certbot & nginx via docker-compose.yml
 email="" # Adding a valid address is strongly recommended
