@@ -1,1 +1,3 @@
 .env
+data/certbot/
+data/nginx/conf.d/app.conf
