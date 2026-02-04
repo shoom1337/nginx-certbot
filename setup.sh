@@ -123,6 +123,13 @@ EOF
   echo
 }
 
+# ─── Patch index.html ──────────────────────────────────────
+patch_index() {
+  sed -i "s|{{DOMAIN_NAME}}|${DOMAIN_NAME}|g" sites/index.html
+  success "index.html updated with domain"
+  echo
+}
+
 # ─── Confirm ───────────────────────────────────────────────
 confirm() {
   echo
@@ -196,6 +203,7 @@ main() {
   check_prereqs
   collect_input
   generate_env
+  patch_index
   confirm
   run_init
   start_server
