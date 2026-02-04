@@ -15,7 +15,7 @@
 ## Быстрый старт
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/shoom1337/nginx-certbot.git
 cd nginx-certbot
 bash setup.sh
 ```
