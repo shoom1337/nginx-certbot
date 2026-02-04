@@ -1,4 +1,4 @@
-[![CI](https://github.com/shoom1337/nginx-certbot/actions/workflows/ci.yml/badge.svg)](https://github.com/shoom1337/nginx-certbot/actions/workflows/ci.yml)
+[![CI](https://github.com/shoom1337/nginx-certbot/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/shoom1337/nginx-certbot/actions/workflows/ci.yml)
 
 # nginx + Let's Encrypt SSL
 
