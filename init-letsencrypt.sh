@@ -6,7 +6,8 @@ if [ ! -f .env ]; then
   echo '[ERROR] .env file not found. Run setup.sh first.' >&2
   exit 1
 fi
-export $(grep -v '^#' .env | xargs)
+vars=$(grep -v '^#' .env | xargs)
+export $vars
 
 # ─── Variables ─────────────────────────────────────────────
 domain="$DOMAIN_NAME"
