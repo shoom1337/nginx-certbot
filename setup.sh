@@ -100,8 +100,7 @@ generate_env() {
     read -r overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
       warn "Keeping existing .env. Using its values."
-      vars=$(grep -v '^#' .env | xargs)
-      export $vars
+      while IFS='=' read -r key value; do export "$key=$value"; done < <(grep -v '^#' .env | grep -v '^$')
       return
     fi
   fi

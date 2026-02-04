@@ -39,7 +39,8 @@ jobs:
         run: dos2unix docker-compose.yml
 
       - name: Validate docker-compose.yml syntax
-        run: yamllint -d "{extends: default, rules: {line-length: disable, trailing-spaces: disable}}" docker-compose.yml
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: disable, trailing-spaces: disable}}" docker-compose.yml
 
       - name: Check all .env-example variables are used in docker-compose.yml or scripts
         run: |
