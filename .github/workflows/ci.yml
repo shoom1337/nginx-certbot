@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ─── 1. Shellcheck ──────────────────────────────────────────
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck and dos2unix
+        run: sudo apt-get install -y shellcheck dos2unix
+
+      - name: Normalize line endings
+        run: dos2unix setup.sh init-letsencrypt.sh
+
+      - name: Run shellcheck
+        run: shellcheck setup.sh init-letsencrypt.sh
+
+  # ─── 2. YAML + env валидация ────────────────────────────────
+  validate-env:
+    name: YAML + env validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yamllint and dos2unix
+        run: |
+          pip install yamllint
+          sudo apt-get install -y dos2unix
+
+      - name: Normalize line endings
+        run: dos2unix docker-compose.yml
+
+      - name: Validate docker-compose.yml syntax
+        run: yamllint -d "{extends: default, rules: {line-length: disable, trailing-spaces: disable}}" docker-compose.yml
+
+      - name: Check all .env-example variables are used in docker-compose.yml or scripts
+        run: |
+          # Извлекаем имена переменных из .env-example (без значений, без пустых строк)
+          env_vars=$(grep -oP '^[A-Z_]+' .env-example)
+
+          missing=0
+          for var in $env_vars; do
+            # Ищем использование переменной во всех файлах проекта
+            if ! grep -rq "$var" --include="*.yml" --include="*.sh" --include="*.conf*" .; then
+              echo "[FAIL] $var из .env-example не используется в проекте"
+              missing=1
+            else
+              echo "[OK]   $var"
+            fi
+          done
+
+          exit $missing
+
+  # ─── 3. Nginx syntax check ──────────────────────────────────
+  nginx-syntax:
+    name: Nginx syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalize line endings
+        run: |
+          sudo apt-get install -y dos2unix
+          dos2unix data/nginx/conf.d/app.conf-template
+
+      - name: Run envsubst и nginx -t в контейнере
+        run: |
+          export DOMAIN_NAME=example.com
+
+          # Генерируем app.conf из темплейта
+          envsubst '${DOMAIN_NAME}' < data/nginx/conf.d/app.conf-template > data/nginx/conf.d/app.conf
+
+          # Создаём мок-файлы для include-директив (их нет без сертификата)
+          mkdir -p /tmp/letsencrypt
+          echo "ssl_protocols TLSv1.2 TLSv1.3;" > /tmp/letsencrypt/options-ssl-nginx.conf
+          openssl dhparam -out /tmp/letsencrypt/ssl-dhparams.pem 2048 2>/dev/null
+
+          # Создаём мок-сертификат
+          mkdir -p /tmp/letsencrypt/live/example.com
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -keyout /tmp/letsencrypt/live/example.com/privkey.pem \
+            -out /tmp/letsencrypt/live/example.com/fullchain.pem \
+            -subj '/CN=example.com' 2>/dev/null
+
+          # Патчим пути в сгенерированном конфиге на /tmp
+          sed -i 's|/etc/letsencrypt|/tmp/letsencrypt|g' data/nginx/conf.d/app.conf
+
+          # Проверяем синтаксис через nginx в контейнере
+          docker run --rm \
+            -v "$PWD/data/nginx/conf.d/app.conf:/etc/nginx/conf.d/app.conf:ro" \
+            -v "/tmp/letsencrypt:/tmp/letsencrypt:ro" \
+            nginx:1.21-alpine nginx -t
+
+  # ─── 4. Docker smoke-test ───────────────────────────────────
+  docker-smoke:
+    name: Docker smoke-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalize line endings
+        run: |
+          sudo apt-get install -y dos2unix
+          dos2unix .env-example data/nginx/conf.d/app.conf-template docker-compose.yml
+
+      - name: Создать .env из .env-example
+        run: cp .env-example .env
+
+      - name: Проверить docker compose config
+        run: docker compose config
+
+      - name: Проверить envsubst подстановку
+        run: |
+          export DOMAIN_NAME=example.com
+
+          envsubst '${DOMAIN_NAME}' < data/nginx/conf.d/app.conf-template > data/nginx/conf.d/app.conf
+
+          # Убедимся что DOMAIN_NAME подставлена и ${DOMAIN_NAME} не осталось
+          if grep -q '\${DOMAIN_NAME}' data/nginx/conf.d/app.conf; then
+            echo "[FAIL] envsubst не подставил DOMAIN_NAME"
+            exit 1
+          fi
+
+          if ! grep -q 'example.com' data/nginx/conf.d/app.conf; then
+            echo "[FAIL] example.com не найдено в сгенерированном app.conf"
+            exit 1
+          fi
+
+          echo "[OK] envsubst работает корректно"
+          cat data/nginx/conf.d/app.conf
+
+      - name: Pull образы
+        run: docker compose pull
