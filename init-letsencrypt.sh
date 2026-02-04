@@ -6,7 +6,7 @@ if [ ! -f .env ]; then
   echo '[ERROR] .env file not found. Run setup.sh first.' >&2
   exit 1
 fi
-while IFS= read -r line; do export "$line"; done < <(grep -v '^#' .env | grep -v '^$')
+while IFS='=' read -r key value; do export "$key=$value"; done < <(grep -v '^#' .env | grep -v '^$')
 
 # ─── Variables ─────────────────────────────────────────────
 domain="$DOMAIN_NAME"
